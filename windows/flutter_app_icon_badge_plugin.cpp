@@ -153,7 +153,7 @@ void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
       error_stream << "Badge update failed with error code: 0x" << std::hex << hr;
       throw std::runtime_error(error_stream.str());
     }
-  } catch (const std::exception& ex) {
+  } catch (const std::exception&) {
     throw std::runtime_error("Badge update failed");
   } catch (...) {
     throw std::runtime_error("Badge update failed with unknown error");
@@ -181,7 +181,7 @@ void FlutterAppIconBadgePlugin::RemoveBadge() {
       error_stream << "Badge removal failed with error code: 0x" << std::hex << hr;
       throw std::runtime_error(error_stream.str());
     }
-  } catch (const std::exception& ex) {
+  } catch (const std::exception&) {
     throw std::runtime_error("Badge removal failed");
   } catch (...) {
     throw std::runtime_error("Badge removal failed with unknown error");
