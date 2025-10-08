@@ -46,8 +46,8 @@ class FlutterAppIconBadgePlugin : public flutter::Plugin {
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
   
   // Helper methods for badge operations
-  void UpdateBadge(int count);
-  void RemoveBadge();
+  bool UpdateBadge(int count);
+  bool RemoveBadge();
   bool IsAppBadgeSupported();
   bool IsAppFocused();
   
@@ -90,21 +90,27 @@ void FlutterAppIconBadgePlugin::HandleMethodCall(
         auto count_it = arguments->find(flutter::EncodableValue("count"));
         if (count_it != arguments->end()) {
           int count = std::get<int>(count_it->second);
-          UpdateBadge(count);
-          result->Success();
+          if (UpdateBadge(count)) {
+            result->Success();
+          } else {
+            result->Error("BADGE_ERROR", "Failed to update badge");
+          }
           return;
         }
       }
       result->Error("INVALID_ARGUMENT", "Count parameter is required");
-    } catch (const std::exception& e) {
-      result->Error("BADGE_ERROR", "Failed to update badge", flutter::EncodableValue(e.what()));
+    } catch (...) {
+      result->Error("BADGE_ERROR", "Failed to update badge");
     }
   } else if (method_call.method_name().compare("removeBadge") == 0) {
     try {
-      RemoveBadge();
-      result->Success();
-    } catch (const std::exception& e) {
-      result->Error("BADGE_ERROR", "Failed to remove badge", flutter::EncodableValue(e.what()));
+      if (RemoveBadge()) {
+        result->Success();
+      } else {
+        result->Error("BADGE_ERROR", "Failed to remove badge");
+      }
+    } catch (...) {
+      result->Error("BADGE_ERROR", "Failed to remove badge");
     }
   } else if (method_call.method_name().compare("isAppBadgeSupported") == 0) {
     result->Success(flutter::EncodableValue(IsAppBadgeSupported()));
@@ -115,7 +121,7 @@ void FlutterAppIconBadgePlugin::HandleMethodCall(
   }
 }
 
-void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
+bool FlutterAppIconBadgePlugin::UpdateBadge(int count) {
   try {
     EnsureWinRTInitialized();
     
@@ -123,7 +129,7 @@ void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
     if (count <= 0) {
       auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
       badgeUpdater.Clear();
-      return;
+      return true;
     }
     
     // Get the badge template for numeric badges
@@ -141,26 +147,14 @@ void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
     
     // Update the badge
     badgeUpdater.Update(badge);
-  } catch (const winrt::hresult_error& ex) {
-    // Handle specific WinRT error codes
-    HRESULT hr = ex.code();
-    if (hr == E_ACCESSDENIED) {
-      throw std::runtime_error("Access denied - badge notifications may be disabled");
-    } else if (hr == E_NOTIMPL) {
-      throw std::runtime_error("Badge notifications not supported on this system");
-    } else {
-      std::ostringstream error_stream;
-      error_stream << "Badge update failed with error code: 0x" << std::hex << hr;
-      throw std::runtime_error(error_stream.str());
-    }
-  } catch (const std::exception&) {
-    throw std::runtime_error("Badge update failed");
+    return true;
   } catch (...) {
-    throw std::runtime_error("Badge update failed with unknown error");
+    // Return false on any error
+    return false;
   }
 }
 
-void FlutterAppIconBadgePlugin::RemoveBadge() {
+bool FlutterAppIconBadgePlugin::RemoveBadge() {
   try {
     EnsureWinRTInitialized();
     
@@ -169,22 +163,10 @@ void FlutterAppIconBadgePlugin::RemoveBadge() {
     
     // Clear the badge
     badgeUpdater.Clear();
-  } catch (const winrt::hresult_error& ex) {
-    // Handle specific WinRT error codes
-    HRESULT hr = ex.code();
-    if (hr == E_ACCESSDENIED) {
-      throw std::runtime_error("Access denied - badge notifications may be disabled");
-    } else if (hr == E_NOTIMPL) {
-      throw std::runtime_error("Badge notifications not supported on this system");
-    } else {
-      std::ostringstream error_stream;
-      error_stream << "Badge removal failed with error code: 0x" << std::hex << hr;
-      throw std::runtime_error(error_stream.str());
-    }
-  } catch (const std::exception&) {
-    throw std::runtime_error("Badge removal failed");
+    return true;
   } catch (...) {
-    throw std::runtime_error("Badge removal failed with unknown error");
+    // Return false on any error
+    return false;
   }
 }
 
