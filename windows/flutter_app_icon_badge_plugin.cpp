@@ -16,6 +16,7 @@
 #include <map>
 #include <memory>
 #include <sstream>
+#include <iomanip>
 
 // WinRT includes for badge notifications
 #include <winrt/base.h>
@@ -141,16 +142,21 @@ void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
     // Update the badge
     badgeUpdater.Update(badge);
   } catch (const winrt::hresult_error& ex) {
-    // Handle WinRT specific exceptions
-    std::string error_msg = "WinRT error: " + winrt::to_string(ex.message());
-    throw std::runtime_error(error_msg);
+    // Handle specific WinRT error codes
+    HRESULT hr = ex.code();
+    if (hr == E_ACCESSDENIED) {
+      throw std::runtime_error("Access denied - badge notifications may be disabled");
+    } else if (hr == E_NOTIMPL) {
+      throw std::runtime_error("Badge notifications not supported on this system");
+    } else {
+      std::ostringstream error_stream;
+      error_stream << "Badge update failed with error code: 0x" << std::hex << hr;
+      throw std::runtime_error(error_stream.str());
+    }
   } catch (const std::exception& ex) {
-    // Handle standard exceptions
-    std::string error_msg = "Standard error: " + std::string(ex.what());
-    throw std::runtime_error(error_msg);
+    throw std::runtime_error("Badge update failed");
   } catch (...) {
-    // Handle unknown exceptions
-    throw std::runtime_error("Unknown error occurred while updating badge");
+    throw std::runtime_error("Badge update failed with unknown error");
   }
 }
 
@@ -164,16 +170,21 @@ void FlutterAppIconBadgePlugin::RemoveBadge() {
     // Clear the badge
     badgeUpdater.Clear();
   } catch (const winrt::hresult_error& ex) {
-    // Handle WinRT specific exceptions
-    std::string error_msg = "WinRT error: " + winrt::to_string(ex.message());
-    throw std::runtime_error(error_msg);
+    // Handle specific WinRT error codes
+    HRESULT hr = ex.code();
+    if (hr == E_ACCESSDENIED) {
+      throw std::runtime_error("Access denied - badge notifications may be disabled");
+    } else if (hr == E_NOTIMPL) {
+      throw std::runtime_error("Badge notifications not supported on this system");
+    } else {
+      std::ostringstream error_stream;
+      error_stream << "Badge removal failed with error code: 0x" << std::hex << hr;
+      throw std::runtime_error(error_stream.str());
+    }
   } catch (const std::exception& ex) {
-    // Handle standard exceptions
-    std::string error_msg = "Standard error: " + std::string(ex.what());
-    throw std::runtime_error(error_msg);
+    throw std::runtime_error("Badge removal failed");
   } catch (...) {
-    // Handle unknown exceptions
-    throw std::runtime_error("Unknown error occurred while removing badge");
+    throw std::runtime_error("Badge removal failed with unknown error");
   }
 }
 
