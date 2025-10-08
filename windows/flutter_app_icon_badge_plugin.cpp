@@ -23,11 +23,13 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/Windows.UI.Notifications.h>
+#include <winrt/Windows.ApplicationModel.h>
 
 using namespace winrt;
 using namespace Windows::Foundation;
 using namespace Windows::Data::Xml::Dom;
 using namespace Windows::UI::Notifications;
+using namespace Windows::ApplicationModel;
 
 namespace {
 
@@ -53,6 +55,9 @@ class FlutterAppIconBadgePlugin : public flutter::Plugin {
   
   // WinRT initialization
   void EnsureWinRTInitialized();
+  
+  // Check if app is packaged
+  bool IsPackagedApp();
   
  private:
   bool winrt_initialized_ = false;
@@ -194,6 +199,11 @@ bool FlutterAppIconBadgePlugin::IsAppBadgeSupported() {
     return false;
   }
   
+  // Badge notifications require a packaged app identity
+  if (!IsPackagedApp()) {
+    return false;
+  }
+  
   // Test if we can actually create a badge updater
   try {
     EnsureWinRTInitialized();
@@ -228,6 +238,18 @@ void FlutterAppIconBadgePlugin::EnsureWinRTInitialized() {
         throw;
       }
     }
+  }
+}
+
+bool FlutterAppIconBadgePlugin::IsPackagedApp() {
+  try {
+    EnsureWinRTInitialized();
+    // Try to get the current package - this will fail for unpackaged apps
+    auto package = Package::Current();
+    return package != nullptr;
+  } catch (...) {
+    // If we can't get the package, we're probably unpackaged
+    return false;
   }
 }
 
