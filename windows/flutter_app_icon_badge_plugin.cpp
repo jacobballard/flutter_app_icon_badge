@@ -123,6 +123,7 @@ void FlutterAppIconBadgePlugin::HandleMethodCall(
 
 bool FlutterAppIconBadgePlugin::UpdateBadge(int count) {
   try {
+    // Step 1: Initialize WinRT
     EnsureWinRTInitialized();
     
     // If count is 0, clear the badge instead
@@ -132,24 +133,41 @@ bool FlutterAppIconBadgePlugin::UpdateBadge(int count) {
       return true;
     }
     
-    // Get the badge template for numeric badges
+    // Step 2: Get the badge template for numeric badges
     auto badgeXml = BadgeUpdateManager::GetTemplateContent(BadgeTemplateType::BadgeNumber);
+    if (!badgeXml) {
+      return false;
+    }
     
-    // Set the badge value
+    // Step 3: Set the badge value
     auto badgeElement = badgeXml.SelectSingleNode(L"/badge").as<XmlElement>();
+    if (!badgeElement) {
+      return false;
+    }
     badgeElement.SetAttribute(L"value", winrt::to_hstring(count));
     
-    // Create the badge notification
+    // Step 4: Create the badge notification
     auto badge = BadgeNotification(badgeXml);
     
-    // Create the badge updater for the application
+    // Step 5: Create the badge updater for the application
     auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+    if (!badgeUpdater) {
+      return false;
+    }
     
-    // Update the badge
+    // Step 6: Update the badge
     badgeUpdater.Update(badge);
     return true;
+  } catch (const winrt::hresult_error& ex) {
+    // Check specific error codes
+    HRESULT hr = ex.code();
+    // Common error codes:
+    // 0x80070005 = E_ACCESSDENIED (notifications disabled)
+    // 0x80040154 = REGDB_E_CLASSNOTREG (WinRT not available)
+    // 0x8000FFFF = E_UNEXPECTED (general failure)
+    return false;
   } catch (...) {
-    // Return false on any error
+    // Return false on any other error
     return false;
   }
 }
@@ -172,7 +190,18 @@ bool FlutterAppIconBadgePlugin::RemoveBadge() {
 
 bool FlutterAppIconBadgePlugin::IsAppBadgeSupported() {
   // Badge notifications are supported on Windows 10 and later
-  return IsWindows10OrGreater();
+  if (!IsWindows10OrGreater()) {
+    return false;
+  }
+  
+  // Test if we can actually create a badge updater
+  try {
+    EnsureWinRTInitialized();
+    auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+    return badgeUpdater != nullptr;
+  } catch (...) {
+    return false;
+  }
 }
 
 bool FlutterAppIconBadgePlugin::IsAppFocused() {
