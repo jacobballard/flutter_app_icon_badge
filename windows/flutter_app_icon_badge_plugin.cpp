@@ -163,10 +163,8 @@ bool FlutterAppIconBadgePlugin::UpdateBadge(int count) {
     // Step 6: Update the badge
     badgeUpdater.Update(badge);
     return true;
-  } catch (const winrt::hresult_error& ex) {
-    // Check specific error codes
-    HRESULT hr = ex.code();
-    // Common error codes:
+  } catch (const winrt::hresult_error&) {
+    // Common error codes that could occur:
     // 0x80070005 = E_ACCESSDENIED (notifications disabled)
     // 0x80040154 = REGDB_E_CLASSNOTREG (WinRT not available)
     // 0x8000FFFF = E_UNEXPECTED (general failure)
