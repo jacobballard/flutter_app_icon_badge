@@ -1,6 +1,9 @@
 # Flutter App Icon Badge plugin
 
-[![Pub](https://img.shields.io/pub/v/flutter_app_icon_badge.svg)](https://pub.dartlang.org/packages/flutter_app_icon_badge)
+> **ℹ️ This is a community fork of [badver/flutter_app_icon_badge](https://github.com/badver/flutter_app_icon_badge).**
+>
+> This fork may include additional features, bug fixes, and platform support not present in the original repository.
+
 
 This [Flutter](https://flutter.io) plugin you can use to change the badge on the icon of your app
 
