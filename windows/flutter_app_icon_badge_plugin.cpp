@@ -22,18 +22,12 @@
 #include <sstream>
 #include <iomanip>
 
-// WinRT includes for badge notifications
+// WinRT includes for badge notifications - include after COM headers
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/Windows.UI.Notifications.h>
 #include <winrt/Windows.ApplicationModel.h>
-
-using namespace winrt;
-using namespace Windows::Foundation;
-using namespace Windows::Data::Xml::Dom;
-using namespace Windows::UI::Notifications;
-using namespace Windows::ApplicationModel;
 
 namespace {
 
@@ -161,18 +155,18 @@ bool FlutterAppIconBadgePlugin::UpdateBadge(int count) {
       EnsureWinRTInitialized();
       
       if (count <= 0) {
-        auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+        auto badgeUpdater = winrt::Windows::UI::Notifications::BadgeUpdateManager::CreateBadgeUpdaterForApplication();
         badgeUpdater.Clear();
         return true;
       }
       
-      auto badgeXml = BadgeUpdateManager::GetTemplateContent(BadgeTemplateType::BadgeNumber);
+      auto badgeXml = winrt::Windows::UI::Notifications::BadgeUpdateManager::GetTemplateContent(winrt::Windows::UI::Notifications::BadgeTemplateType::BadgeNumber);
       if (badgeXml) {
-        auto badgeElement = badgeXml.SelectSingleNode(L"/badge").as<XmlElement>();
+        auto badgeElement = badgeXml.SelectSingleNode(L"/badge").as<winrt::Windows::Data::Xml::Dom::XmlElement>();
         if (badgeElement) {
           badgeElement.SetAttribute(L"value", winrt::to_hstring(count));
-          auto badge = BadgeNotification(badgeXml);
-          auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+          auto badge = winrt::Windows::UI::Notifications::BadgeNotification(badgeXml);
+          auto badgeUpdater = winrt::Windows::UI::Notifications::BadgeUpdateManager::CreateBadgeUpdaterForApplication();
           if (badgeUpdater) {
             badgeUpdater.Update(badge);
             return true;
@@ -193,7 +187,7 @@ bool FlutterAppIconBadgePlugin::RemoveBadge() {
   if (IsPackagedApp()) {
     try {
       EnsureWinRTInitialized();
-      auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+      auto badgeUpdater = winrt::Windows::UI::Notifications::BadgeUpdateManager::CreateBadgeUpdaterForApplication();
       if (badgeUpdater) {
         badgeUpdater.Clear();
         return true;
@@ -244,7 +238,7 @@ bool FlutterAppIconBadgePlugin::IsPackagedApp() {
   try {
     EnsureWinRTInitialized();
     // Try to get the current package - this will fail for unpackaged apps
-    auto package = Package::Current();
+    auto package = winrt::Windows::ApplicationModel::Package::Current();
     return package != nullptr;
   } catch (...) {
     // If we can't get the package, we're probably unpackaged
