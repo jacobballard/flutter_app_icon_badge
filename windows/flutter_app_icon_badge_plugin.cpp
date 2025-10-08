@@ -9,6 +9,10 @@
 // For RPC constants
 #include <rpcndr.h>
 
+// For taskbar overlay icons
+#include <shobjidl.h>
+#include <comdef.h>
+
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
@@ -59,8 +63,15 @@ class FlutterAppIconBadgePlugin : public flutter::Plugin {
   // Check if app is packaged
   bool IsPackagedApp();
   
+  // Taskbar overlay methods (for unpackaged apps)
+  bool UpdateBadgeWithOverlay(int count);
+  bool RemoveBadgeOverlay();
+  HICON CreateBadgeIcon(int count);
+  HWND GetMainWindowHandle();
+  
  private:
   bool winrt_initialized_ = false;
+  ITaskbarList3* taskbar_list_ = nullptr;
 };
 
 // static
@@ -81,9 +92,26 @@ void FlutterAppIconBadgePlugin::RegisterWithRegistrar(
   registrar->AddPlugin(std::move(plugin));
 }
 
-FlutterAppIconBadgePlugin::FlutterAppIconBadgePlugin() {}
+FlutterAppIconBadgePlugin::FlutterAppIconBadgePlugin() {
+  // Initialize COM for taskbar operations
+  CoInitialize(nullptr);
+  
+  // Create taskbar list interface
+  CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER,
+                   IID_ITaskbarList3, (void**)&taskbar_list_);
+  
+  if (taskbar_list_) {
+    taskbar_list_->HrInit();
+  }
+}
 
-FlutterAppIconBadgePlugin::~FlutterAppIconBadgePlugin() {}
+FlutterAppIconBadgePlugin::~FlutterAppIconBadgePlugin() {
+  if (taskbar_list_) {
+    taskbar_list_->Release();
+    taskbar_list_ = nullptr;
+  }
+  CoUninitialize();
+}
 
 void FlutterAppIconBadgePlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
@@ -127,89 +155,62 @@ void FlutterAppIconBadgePlugin::HandleMethodCall(
 }
 
 bool FlutterAppIconBadgePlugin::UpdateBadge(int count) {
-  try {
-    // Step 1: Initialize WinRT
-    EnsureWinRTInitialized();
-    
-    // If count is 0, clear the badge instead
-    if (count <= 0) {
-      auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
-      badgeUpdater.Clear();
-      return true;
+  // Try WinRT approach first (for packaged apps)
+  if (IsPackagedApp()) {
+    try {
+      EnsureWinRTInitialized();
+      
+      if (count <= 0) {
+        auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+        badgeUpdater.Clear();
+        return true;
+      }
+      
+      auto badgeXml = BadgeUpdateManager::GetTemplateContent(BadgeTemplateType::BadgeNumber);
+      if (badgeXml) {
+        auto badgeElement = badgeXml.SelectSingleNode(L"/badge").as<XmlElement>();
+        if (badgeElement) {
+          badgeElement.SetAttribute(L"value", winrt::to_hstring(count));
+          auto badge = BadgeNotification(badgeXml);
+          auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+          if (badgeUpdater) {
+            badgeUpdater.Update(badge);
+            return true;
+          }
+        }
+      }
+    } catch (...) {
+      // Fall through to taskbar overlay approach
     }
-    
-    // Step 2: Get the badge template for numeric badges
-    auto badgeXml = BadgeUpdateManager::GetTemplateContent(BadgeTemplateType::BadgeNumber);
-    if (!badgeXml) {
-      return false;
-    }
-    
-    // Step 3: Set the badge value
-    auto badgeElement = badgeXml.SelectSingleNode(L"/badge").as<XmlElement>();
-    if (!badgeElement) {
-      return false;
-    }
-    badgeElement.SetAttribute(L"value", winrt::to_hstring(count));
-    
-    // Step 4: Create the badge notification
-    auto badge = BadgeNotification(badgeXml);
-    
-    // Step 5: Create the badge updater for the application
-    auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
-    if (!badgeUpdater) {
-      return false;
-    }
-    
-    // Step 6: Update the badge
-    badgeUpdater.Update(badge);
-    return true;
-  } catch (const winrt::hresult_error&) {
-    // Common error codes that could occur:
-    // 0x80070005 = E_ACCESSDENIED (notifications disabled)
-    // 0x80040154 = REGDB_E_CLASSNOTREG (WinRT not available)
-    // 0x8000FFFF = E_UNEXPECTED (general failure)
-    return false;
-  } catch (...) {
-    // Return false on any other error
-    return false;
   }
+  
+  // Use taskbar overlay approach (for unpackaged apps)
+  return UpdateBadgeWithOverlay(count);
 }
 
 bool FlutterAppIconBadgePlugin::RemoveBadge() {
-  try {
-    EnsureWinRTInitialized();
-    
-    // Create the badge updater for the application
-    auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
-    
-    // Clear the badge
-    badgeUpdater.Clear();
-    return true;
-  } catch (...) {
-    // Return false on any error
-    return false;
+  // Try WinRT approach first (for packaged apps)
+  if (IsPackagedApp()) {
+    try {
+      EnsureWinRTInitialized();
+      auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+      if (badgeUpdater) {
+        badgeUpdater.Clear();
+        return true;
+      }
+    } catch (...) {
+      // Fall through to taskbar overlay approach
+    }
   }
+  
+  // Use taskbar overlay approach (for unpackaged apps)
+  return RemoveBadgeOverlay();
 }
 
 bool FlutterAppIconBadgePlugin::IsAppBadgeSupported() {
-  // Badge notifications are supported on Windows 10 and later
-  if (!IsWindows10OrGreater()) {
-    return false;
-  }
-  
-  // Badge notifications require a packaged app identity
-  if (!IsPackagedApp()) {
-    return false;
-  }
-  
-  // Test if we can actually create a badge updater
-  try {
-    EnsureWinRTInitialized();
-    auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
-    return badgeUpdater != nullptr;
-  } catch (...) {
-    return false;
-  }
+  // Badge functionality is supported on Windows 7 and later
+  // (WinRT badges on Win10+, taskbar overlays on Win7+)
+  return IsWindows7OrGreater();
 }
 
 bool FlutterAppIconBadgePlugin::IsAppFocused() {
@@ -249,6 +250,140 @@ bool FlutterAppIconBadgePlugin::IsPackagedApp() {
     // If we can't get the package, we're probably unpackaged
     return false;
   }
+}
+
+bool FlutterAppIconBadgePlugin::UpdateBadgeWithOverlay(int count) {
+  if (!taskbar_list_) {
+    return false;
+  }
+  
+  HWND hwnd = GetMainWindowHandle();
+  if (!hwnd) {
+    return false;
+  }
+  
+  if (count <= 0) {
+    // Remove overlay
+    return SUCCEEDED(taskbar_list_->SetOverlayIcon(hwnd, nullptr, L""));
+  }
+  
+  // Create badge icon
+  HICON badgeIcon = CreateBadgeIcon(count);
+  if (!badgeIcon) {
+    return false;
+  }
+  
+  // Set overlay icon
+  wchar_t description[32];
+  swprintf_s(description, L"Badge: %d", count);
+  HRESULT hr = taskbar_list_->SetOverlayIcon(hwnd, badgeIcon, description);
+  
+  DestroyIcon(badgeIcon);
+  return SUCCEEDED(hr);
+}
+
+bool FlutterAppIconBadgePlugin::RemoveBadgeOverlay() {
+  if (!taskbar_list_) {
+    return false;
+  }
+  
+  HWND hwnd = GetMainWindowHandle();
+  if (!hwnd) {
+    return false;
+  }
+  
+  return SUCCEEDED(taskbar_list_->SetOverlayIcon(hwnd, nullptr, L""));
+}
+
+HICON FlutterAppIconBadgePlugin::CreateBadgeIcon(int count) {
+  // Create a small icon (16x16) with the badge number
+  const int iconSize = 16;
+  
+  // Create device context
+  HDC hdc = GetDC(nullptr);
+  HDC memDC = CreateCompatibleDC(hdc);
+  
+  // Create bitmap
+  HBITMAP hBitmap = CreateCompatibleBitmap(hdc, iconSize, iconSize);
+  HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, hBitmap);
+  
+  // Create mask bitmap
+  HBITMAP hMask = CreateBitmap(iconSize, iconSize, 1, 1, nullptr);
+  
+  // Fill with red background
+  HBRUSH redBrush = CreateSolidBrush(RGB(255, 0, 0));
+  RECT rect = {0, 0, iconSize, iconSize};
+  FillRect(memDC, &rect, redBrush);
+  DeleteObject(redBrush);
+  
+  // Draw text
+  SetTextColor(memDC, RGB(255, 255, 255));
+  SetBkMode(memDC, TRANSPARENT);
+  
+  wchar_t text[8];
+  if (count > 99) {
+    wcscpy_s(text, L"99+");
+  } else {
+    swprintf_s(text, L"%d", count);
+  }
+  
+  // Use small font
+  HFONT font = CreateFont(10, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+                         DEFAULT_PITCH | FF_DONTCARE, L"Arial");
+  HFONT oldFont = (HFONT)SelectObject(memDC, font);
+  
+  DrawText(memDC, text, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+  
+  // Cleanup
+  SelectObject(memDC, oldFont);
+  SelectObject(memDC, oldBitmap);
+  DeleteObject(font);
+  DeleteDC(memDC);
+  ReleaseDC(nullptr, hdc);
+  
+  // Create icon
+  ICONINFO iconInfo = {};
+  iconInfo.fIcon = TRUE;
+  iconInfo.hbmMask = hMask;
+  iconInfo.hbmColor = hBitmap;
+  
+  HICON hIcon = CreateIconIndirect(&iconInfo);
+  
+  DeleteObject(hBitmap);
+  DeleteObject(hMask);
+  
+  return hIcon;
+}
+
+HWND FlutterAppIconBadgePlugin::GetMainWindowHandle() {
+  // Find the main Flutter window
+  DWORD processId = GetCurrentProcessId();
+  HWND result = nullptr;
+  
+  struct EnumData {
+    DWORD processId;
+    HWND* result;
+  } enumData = { processId, &result };
+  
+  EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+    EnumData* data = (EnumData*)lParam;
+    DWORD windowProcessId;
+    GetWindowThreadProcessId(hwnd, &windowProcessId);
+    
+    if (windowProcessId == data->processId && IsWindowVisible(hwnd)) {
+      // Check if this is the main window (has a title)
+      wchar_t title[256];
+      if (GetWindowText(hwnd, title, sizeof(title)/sizeof(wchar_t)) > 0) {
+        *(data->result) = hwnd;
+        return FALSE; // Stop enumeration
+      }
+    }
+    return TRUE; // Continue enumeration
+  }, (LPARAM)&enumData);
+  
+  return result;
 }
 
 }  // namespace
