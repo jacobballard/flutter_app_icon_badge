@@ -7,8 +7,8 @@ This [Flutter](https://flutter.io) plugin you can use to change the badge on the
 ## Supported platforms
 * iOS
 * Android - some Android devices (the official API does not support the feature, even on Oreo)
-* MacOs
-* Windows - work in progress (need help)
+* macOS
+* Windows - ✅ **NEW!** Full support using Windows Runtime badge notifications (Windows 10+)
 * Linux - work in progress (need help)
 
 ## Getting Started
@@ -31,6 +31,9 @@ Please also add the following to your Info.plist:
 On Android, no official API exists to show a badge in the launcher. But some devices (Samsung, HTC...) support the feature.
 Thanks to the [Shortcut Badger library](https://github.com/leolin310148/ShortcutBadger/), ~ 16 launchers are supported.
 
+### Windows
+
+On Windows 10 and later, badge notifications are fully supported using the Windows Runtime (WinRT) API. The badge will appear on both the taskbar icon and the Start menu tile. No additional configuration is required.
 
 ### Dart
 
@@ -56,5 +59,5 @@ FlutterAppIconBadge.isAppBadgeSupported();
 
 Another useful method in this plugin - detect if flutter desktop window in focus or not:
 ```dart
-FlutterAppIconBadge.isAppBadgeSupported();
+FlutterAppIconBadge.isAppFocused();
 ```

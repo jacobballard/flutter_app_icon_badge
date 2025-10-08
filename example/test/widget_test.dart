@@ -11,17 +11,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_app_icon_badge_example/main.dart';
 
 void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
+  testWidgets('Verify badge plugin UI', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(MyApp());
+    await tester.pumpWidget(const MyApp());
 
-    // Verify that platform version is retrieved.
+    // Verify that badge support status is displayed.
     expect(
       find.byWidgetPredicate(
         (Widget widget) =>
-            widget is Text && widget.data.startsWith('Running on:'),
+            widget is Text && widget.data?.startsWith('Badge supported:') == true,
       ),
       findsOneWidget,
     );
+
+    // Verify buttons are present
+    expect(find.text('Add badge'), findsOneWidget);
+    expect(find.text('Remove badge'), findsOneWidget);
+    expect(find.text('Check focus after 5 seconds'), findsOneWidget);
   });
 }

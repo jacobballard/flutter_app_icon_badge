@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_app_icon_badge/flutter_app_icon_badge.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(const MyApp());
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
@@ -14,12 +16,12 @@ class _MyAppState extends State<MyApp> {
   bool _isFocused = true;
 
   @override
-  initState() {
+  void initState() {
     super.initState();
     initPlatformState();
   }
 
-  initPlatformState() async {
+  Future<void> initPlatformState() async {
     String appBadgeSupported;
     try {
       bool res = await FlutterAppIconBadge.isAppBadgeSupported();
@@ -47,7 +49,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: Text('Plugin example app'),
+          title: const Text('Plugin example app'),
         ),
         body: SizedBox.expand(
           child: Column(
@@ -56,28 +58,24 @@ class _MyAppState extends State<MyApp> {
             children: <Widget>[
               Text('Badge supported: $_appBadgeSupported'),
               Text('Focused: $_isFocused'),
-              RaisedButton(
-                child: Text('Add badge'),
-                onPressed: () {
-                  _addBadge();
-                },
+              ElevatedButton(
+                onPressed: _addBadge,
+                child: const Text('Add badge'),
               ),
-              RaisedButton(
-                child: Text('Remove badge'),
-                onPressed: () {
-                  _removeBadge();
-                },
+              ElevatedButton(
+                onPressed: _removeBadge,
+                child: const Text('Remove badge'),
               ),
-              RaisedButton(
-                child: Text('Check focus after 5 seconds'),
+              ElevatedButton(
                 onPressed: () {
-                  Future.delayed(Duration(seconds: 5), () async {
+                  Future.delayed(const Duration(seconds: 5), () async {
                     final isFocused = await FlutterAppIconBadge.isAppFocused();
                     setState(() {
                       _isFocused = isFocused;
                     });
                   });
                 },
+                child: const Text('Check focus after 5 seconds'),
               ),
             ],
           ),
