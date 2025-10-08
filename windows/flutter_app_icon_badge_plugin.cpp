@@ -6,6 +6,9 @@
 // For getPlatformVersion; remove unless needed for your plugin implementation.
 #include <VersionHelpers.h>
 
+// For RPC constants
+#include <rpcndr.h>
+
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
@@ -46,6 +49,12 @@ class FlutterAppIconBadgePlugin : public flutter::Plugin {
   void RemoveBadge();
   bool IsAppBadgeSupported();
   bool IsAppFocused();
+  
+  // WinRT initialization
+  void EnsureWinRTInitialized();
+  
+ private:
+  bool winrt_initialized_ = false;
 };
 
 // static
@@ -107,8 +116,14 @@ void FlutterAppIconBadgePlugin::HandleMethodCall(
 
 void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
   try {
-    // Initialize WinRT
-    init_apartment();
+    EnsureWinRTInitialized();
+    
+    // If count is 0, clear the badge instead
+    if (count <= 0) {
+      auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
+      badgeUpdater.Clear();
+      return;
+    }
     
     // Get the badge template for numeric badges
     auto badgeXml = BadgeUpdateManager::GetTemplateContent(BadgeTemplateType::BadgeNumber);
@@ -125,25 +140,40 @@ void FlutterAppIconBadgePlugin::UpdateBadge(int count) {
     
     // Update the badge
     badgeUpdater.Update(badge);
+  } catch (const winrt::hresult_error& ex) {
+    // Handle WinRT specific exceptions
+    std::string error_msg = "WinRT error: " + winrt::to_string(ex.message());
+    throw std::runtime_error(error_msg);
+  } catch (const std::exception& ex) {
+    // Handle standard exceptions
+    std::string error_msg = "Standard error: " + std::string(ex.what());
+    throw std::runtime_error(error_msg);
   } catch (...) {
-    // Handle WinRT exceptions
-    throw std::runtime_error("Failed to update badge");
+    // Handle unknown exceptions
+    throw std::runtime_error("Unknown error occurred while updating badge");
   }
 }
 
 void FlutterAppIconBadgePlugin::RemoveBadge() {
   try {
-    // Initialize WinRT
-    init_apartment();
+    EnsureWinRTInitialized();
     
     // Create the badge updater for the application
     auto badgeUpdater = BadgeUpdateManager::CreateBadgeUpdaterForApplication();
     
     // Clear the badge
     badgeUpdater.Clear();
+  } catch (const winrt::hresult_error& ex) {
+    // Handle WinRT specific exceptions
+    std::string error_msg = "WinRT error: " + winrt::to_string(ex.message());
+    throw std::runtime_error(error_msg);
+  } catch (const std::exception& ex) {
+    // Handle standard exceptions
+    std::string error_msg = "Standard error: " + std::string(ex.what());
+    throw std::runtime_error(error_msg);
   } catch (...) {
-    // Handle WinRT exceptions
-    throw std::runtime_error("Failed to remove badge");
+    // Handle unknown exceptions
+    throw std::runtime_error("Unknown error occurred while removing badge");
   }
 }
 
@@ -161,6 +191,22 @@ bool FlutterAppIconBadgePlugin::IsAppFocused() {
   GetWindowThreadProcessId(foregroundWindow, &foregroundProcessId);
   
   return currentProcessId == foregroundProcessId;
+}
+
+void FlutterAppIconBadgePlugin::EnsureWinRTInitialized() {
+  if (!winrt_initialized_) {
+    try {
+      winrt::init_apartment(winrt::apartment_type::single_threaded);
+      winrt_initialized_ = true;
+    } catch (const winrt::hresult_error& ex) {
+      // If already initialized, that's fine
+      if (ex.code() == RPC_E_CHANGED_MODE) {
+        winrt_initialized_ = true;
+      } else {
+        throw;
+      }
+    }
+  }
 }
 
 }  // namespace
