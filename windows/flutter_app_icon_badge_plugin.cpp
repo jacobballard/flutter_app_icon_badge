@@ -290,30 +290,57 @@ bool FlutterAppIconBadgePlugin::RemoveBadgeOverlay() {
 }
 
 HICON FlutterAppIconBadgePlugin::CreateBadgeIcon(int count) {
-  // Create a small icon (16x16) with the badge number
-  const int iconSize = 16;
+  // Create a larger icon (24x24) for better visibility
+  const int iconSize = 24;
+  const int margin = 2;
+  const int circleSize = iconSize - (margin * 2);
   
   // Create device context
   HDC hdc = GetDC(nullptr);
   HDC memDC = CreateCompatibleDC(hdc);
   
-  // Create bitmap
-  HBITMAP hBitmap = CreateCompatibleBitmap(hdc, iconSize, iconSize);
+  // Create bitmap with alpha channel support
+  BITMAPINFO bmi = {};
+  bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  bmi.bmiHeader.biWidth = iconSize;
+  bmi.bmiHeader.biHeight = -iconSize; // Top-down DIB
+  bmi.bmiHeader.biPlanes = 1;
+  bmi.bmiHeader.biBitCount = 32;
+  bmi.bmiHeader.biCompression = BI_RGB;
+  
+  void* pBits = nullptr;
+  HBITMAP hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, nullptr, 0);
   HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, hBitmap);
   
-  // Create mask bitmap
+  // Create mask bitmap (all transparent initially)
   HBITMAP hMask = CreateBitmap(iconSize, iconSize, 1, 1, nullptr);
+  HDC maskDC = CreateCompatibleDC(hdc);
+  HBITMAP oldMask = (HBITMAP)SelectObject(maskDC, hMask);
   
-  // Fill with red background
-  HBRUSH redBrush = CreateSolidBrush(RGB(255, 0, 0));
-  RECT rect = {0, 0, iconSize, iconSize};
-  FillRect(memDC, &rect, redBrush);
-  DeleteObject(redBrush);
+  // Fill mask with white (transparent)
+  RECT fullRect = {0, 0, iconSize, iconSize};
+  FillRect(maskDC, &fullRect, (HBRUSH)GetStockObject(WHITE_BRUSH));
   
-  // Draw text
-  SetTextColor(memDC, RGB(255, 255, 255));
+  // Enable anti-aliasing
   SetBkMode(memDC, TRANSPARENT);
   
+  // Create circular badge
+  HBRUSH redBrush = CreateSolidBrush(RGB(220, 53, 69)); // Bootstrap red color
+  HPEN redPen = CreatePen(PS_SOLID, 1, RGB(220, 53, 69));
+  HBRUSH oldBrush = (HBRUSH)SelectObject(memDC, redBrush);
+  HPEN oldPen = (HPEN)SelectObject(memDC, redPen);
+  
+  // Draw filled circle
+  Ellipse(memDC, margin, margin, margin + circleSize, margin + circleSize);
+  
+  // Create circular mask (black = opaque)
+  HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
+  HPEN blackPen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0));
+  SelectObject(maskDC, blackBrush);
+  SelectObject(maskDC, blackPen);
+  Ellipse(maskDC, margin, margin, margin + circleSize, margin + circleSize);
+  
+  // Prepare text
   wchar_t text[8];
   if (count > 99) {
     wcscpy_s(text, L"99+");
@@ -321,20 +348,31 @@ HICON FlutterAppIconBadgePlugin::CreateBadgeIcon(int count) {
     swprintf_s(text, L"%d", count);
   }
   
-  // Use small font
-  HFONT font = CreateFont(10, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+  // Create larger font for better readability
+  int fontSize = (count > 9) ? 10 : 12; // Smaller font for 2+ digits
+  HFONT font = CreateFont(fontSize, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
                          DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                         DEFAULT_PITCH | FF_DONTCARE, L"Arial");
+                         CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+                         DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
   HFONT oldFont = (HFONT)SelectObject(memDC, font);
   
-  DrawText(memDC, text, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+  // Draw white text
+  SetTextColor(memDC, RGB(255, 255, 255));
+  RECT textRect = {margin, margin, margin + circleSize, margin + circleSize};
+  DrawText(memDC, text, -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
   
   // Cleanup
   SelectObject(memDC, oldFont);
+  SelectObject(memDC, oldBrush);
+  SelectObject(memDC, oldPen);
   SelectObject(memDC, oldBitmap);
+  SelectObject(maskDC, oldMask);
   DeleteObject(font);
+  DeleteObject(redBrush);
+  DeleteObject(redPen);
+  DeleteObject(blackPen);
   DeleteDC(memDC);
+  DeleteDC(maskDC);
   ReleaseDC(nullptr, hdc);
   
   // Create icon
