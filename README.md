@@ -9,9 +9,9 @@ This [Flutter](https://flutter.io) plugin you can use to change the badge on the
 
 ## Supported platforms
 * iOS
-* Android - some Android devices (the official API does not support the feature, even on Oreo)
+* ~~Android~~ - **REMOVED** in v2.1.0 (unreliable support across devices)
 * macOS
-* Windows - ✅ **NEW!** Full support using Windows Runtime badge notifications (Windows 10+)
+* Windows - ✅ **NEW!** Full support using taskbar overlay icons
 * Linux - work in progress (need help)
 
 ## Getting Started
@@ -28,11 +28,6 @@ Please also add the following to your Info.plist:
         <string>remote-notification</string>
     </array>
 ```
-
-### Android
-
-On Android, no official API exists to show a badge in the launcher. But some devices (Samsung, HTC...) support the feature.
-Thanks to the [Shortcut Badger library](https://github.com/leolin310148/ShortcutBadger/), ~ 16 launchers are supported.
 
 ### Windows
 
