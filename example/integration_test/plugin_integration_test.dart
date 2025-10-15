@@ -15,11 +15,9 @@ import 'package:flutter_app_icon_badge/flutter_app_icon_badge.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('getPlatformVersion test', (WidgetTester tester) async {
-    final FlutterAppIconBadge plugin = FlutterAppIconBadge();
-    final String? version = await plugin.getPlatformVersion();
-    // The version string depends on the host platform running the test, so
-    // just assert that some non-empty string is returned.
-    expect(version?.isNotEmpty, true);
+  testWidgets('isAppBadgeSupported test', (WidgetTester tester) async {
+    final bool isSupported = await FlutterAppIconBadge.isAppBadgeSupported();
+    // The support depends on the host platform running the test
+    expect(isSupported, isA<bool>());
   });
 }

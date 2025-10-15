@@ -8,26 +8,13 @@
 This [Flutter](https://flutter.io) plugin you can use to change the badge on the icon of your app
 
 ## Supported platforms
-* iOS
+* ~~iOS~~ - **REMOVED** in v2.1.0 (focus on desktop platforms)
 * ~~Android~~ - **REMOVED** in v2.1.0 (unreliable support across devices)
-* macOS
+* macOS - ✅ Full support
 * Windows - ✅ **NEW!** Full support using taskbar overlay icons
 * Linux - work in progress (need help)
 
 ## Getting Started
-
-### iOS
-
-On iOS, the notification permission is required to update the badge.
-It is automatically asked when the badge is added or removed.
-
-Please also add the following to your Info.plist:
-```xml
-<key>UIBackgroundModes</key>
-    <array>
-        <string>remote-notification</string>
-    </array>
-```
 
 ### Windows
 
